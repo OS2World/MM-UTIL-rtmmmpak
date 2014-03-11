@@ -1,0 +1,194 @@
+/*
+ *  @(#) MPEG Audio Player maplay 1.2, last edit of this file: 6/23/94 13:02:50
+ *  @(#) Copyright (C) 1993, 1994 Tobias Bading (bading@cs.tu-berlin.de)
+ *  @(#) Berlin University of Technology
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+
+0) Already tested platforms
+
+The source code of this second release of maplay has been successfully tested
+with the following configurations:
+
+ - SPARCstations with SunOS 4.1.1, SunOS 4.1.3, Solaris 2.2 (SunOS 5.2),
+   Solaris 2.3 and GNU C++ 2.5.1, gcc 2.5.4
+ - SGI with IRIX 4.0.5F, GNU C++ 2.5.1, gcc 2.5.4
+   maplay can't be compiled under IRIX 5.x, because of the missing audio
+   library, but binaries created under IRIX 4.0.5F work under IRIX 5.x, too.
+ - '486 under Linux, GNU C++ and gcc
+ - DECstation with ULTRIX 4.2, GNU C++ 2.5.1, gcc 2.5.8
+   maplay can be used as a decoder only on these machines, because the
+   DECstations I saw had not audio device.
+
+-------------------------------------------------------------------------------
+
+1) Compiling the sources
+
+If you have the GNU C++ compiler installed and have a SPARC 10, a SPARC LX
+(not tested yet, just read in the manpage of the dbri device), an Silicon
+Graphics Indigo or a 16 bit soundcard under Linux, simply say "make it so".
+If make didn't create a working binary, please read ahead.
+
+If you have a SPARC with just an amd device, like a SPARC 2, SPARC IPX,
+SPARC classic etc., all I can give you is telephone quality output,
+because this device isn't capable of more. If your system release is
+SunOS 4.1.1 and you have GNU C++ installed, say "make it so". If your
+SunOS release is not 4.1.1 or you have another C++ compiler than g++,
+please take a look at the shell script configuration.sh. If your machine
+has an amd device, please add the -DULAW flag to the variable COMPILERFLAGS.
+configuration.sh specifies values for the following environment variables:
+
+  COMPILER		Put the name of your C++ compiler in here, "g++" for
+			example. You may specify the full path for your
+			compiler if make doesn't find the compiler.
+  COMPILERFLAGS		This variable contains compiler flags for your
+			compiler. The -D flags together with #ifdefs in the
+			sources create the (hopefully) correct program for your
+			machine. You should not change these defines.
+			If you have a SPARC 2/IPX/... with an amd audio
+			device, you should add the -DULAW flag to this
+			variable.
+			Other flags are for optimizations, like "-O2" for the
+			GNU g++, warning output control	etc.
+			What the define "-DDAMN_INTEL_BYTE_ORDER" does
+			should be obvious. It has to be defined on machines
+			which use the same byte	order as Intel processors.
+			(Intel byte order is lowest-byte-first)
+  INCLUDEDIRS		This variable isn't needed anymore, unless your
+			compiler don't know where to find his own include
+			files. In this case, put -I options for include file
+			paths for your compiler	in here.
+  LIBRARIES		This variable should contain -l options needed by
+			your compiler for linking the program. The math
+			library is automatically included in the makefile.
+  AUDIO_INCLUDES	Audio include files, like audio.h or audioio.h, are
+			often placed in different directories on different
+			machines. Put the correct include directive for your
+			machine in here, for example "#include <sys/audio.h>".
+
+The script configuration.sh contains a big switch statement, which tests the
+output of the command "uname -sr". This command should return the name and
+release of your operating system. You should enter this command in a shell
+first, to see if the output matches one of the already existing case entries.
+If so, you can modify the environment settings of this entry according to your
+needs. If your operating system and/or release hasn't been tested by now,
+you may enter your own entry according to the "uname -sr" output and put in
+your environment settings then (see 1.1: Compiling on new platforms).
+If your operating system does not know a uname command, you may write a shell
+script named "uname" containing
+"echo Your_System 1.23"
+and add an entry in the configuration.sh file. Or you can throw away the switch
+statement and leave only your environment settings in the script file.
+
+After you have modified configuration.sh, you can run "make" to start
+compiling. I hope you will be rewarded with an executable after doing so.
+If the compilation process didn't make it till the end, you may try to
+fix the problem. If you need to adjust the environment settings mentioned
+above, you should execute "make clean" thereafter and then "make" again.
+If you don't get the problem fixed, you can send me an email (to
+bading@cs.tu-berlin.de) wherein you describe your problem. You can also send
+me an email, if you successfully compiled the program, but needed to do
+some changes to the sources. These changes may also be useful for other users,
+so I can include your changes in the next release.
+
+I am interested in any experiences in compiling the program on other machines,
+because I can't test the program on any existing type of machine myself.
+Bug reports etc. should be send to bading@cs.tu-berlin.de, too.
+
+-------------------------------------------------------------------------------
+
+1.1) Compiling on new platforms
+
+Due to the fact that you are using a computer on which I have not tested the
+program yet, everthing can happen while compiling the program (who knows?).
+Besides, even if your computer has an audio device with CD-quality, the program
+cannot use it, because each device has a different programming interface, like
+a library or ioctls etc. and maplay 1.2 only contains drivers for Indigos,
+SPARCs and Linux machines. But if you have enough informations about your
+audio device and some knowledge in C/C++, who can write your own output class.
+If you are interested, take a look at chapter 1.2. If you want to use the
+program as a decoder only, you do not have to worry about this.
+
+Ok, now here is what you should do to get the program running on your machine:
+a) Create a new entry in configuration.sh according to your "uname -sr" output.
+b) Set the environment variables COMPILER and LIBRARIES to values usefull on
+   your machine.
+c) Leave AUDIO_INCLUDES empty. If you want to write your own output class, you
+   may need this variable.
+d) Include the following options into the variable COMPILERFLAGS:
+   - the best possible optimization option(s) for your compiler
+     (-O2 for example)
+   - -DDAMN_INTEL_BYTE_ORDER, if your machine uses Intel byte order.
+     (Intel byte order is least significant byte first)
+     If you do not know which byte order is used by your machine, try it
+     without this define first. If the program creates warnings and you get
+     nothing but noise as output, you should add this define, execute
+     "make clean ; make" and try it again.
+   Do not insert the defines "-DIRIX", "-DIndigo", "-DSolaris", "-DSunOS",
+   "-DSunOS4_1_1", "-DSunOS4_1_3", "-DSPARC", "-DLINUX", "-DULTRIX" or "-DDEC"
+   into COMPILERFLAGS. But you can create new define names for your machine.
+
+I hope you get a working executable after modifying configuration.sh and
+running make. If that is not the case, you have two options:
+1. Try to fix the problem yourself with new #ifdefs in the sources.
+2. Send me an email describing your problems.
+
+-------------------------------------------------------------------------------
+
+1.2) Writing a new output class
+
+Ok, you want to write a new output class?
+Then take a look at the file obuffer.h first. The Class Obuffer is an
+abstract base class for all audio output classes. Currently implemented
+derived classes are:
+- class FileObuffer for raw PCM output to a filedescriptor
+- class IndigoObuffer for audio playback on Silicon Graphics Indigo machines
+- class SparcObuffer for audio playback on Sun SPARC 10 machines with the
+  dbri device
+- class LinuxObuffer for audio playback on 16 bit soundcards under Linux
+  using the /dev/dsp device
+
+To access your audio device, the program needs a new class derived from
+Obuffer written for this device. The new class has to implement the
+following methods:
+- a constructor
+  The constructor has to configure the audio device. It should set the
+  number of channels (mono or stereo) and the sample frequency (32, 44.1 or
+  48 kHz) according to the mode of the audio stream. These informations should
+  be included in the parameters of the constructor. The sample format is
+  always 16 bit signed PCM.
+- void append (uint32 channel, int16 value)
+  This function takes a channel number (0 for left or 1 for right) and a
+  PCM sample. The sample should be stored in an array for later output.
+- void write_buffer (int fd)
+  This function should transfer samples from previous calls to append() to the
+  audio device. Samples are not written to the audio device in append(),
+  because a syscall takes too much time. The parameter is a dummy here.
+
+You can take the implementations in obuffer.cc as a guideline.
+To use your class, the main function in maplay.cc has to be modified. Simply
+remove the //s in lines 322-336 and fill in your class name, parameters etc.
+
+If you have implemented a new output class, you will be rewarded with the
+great quality of MPEG audio. And if you think that other users might like
+your class too, sent me a copy of your sources and I will include it in the
+next release.
+
+
+That's all for now and this release,
+bye,
+     Tobias Bading   (bading@cs.tu-berlin.de)

@@ -1,0 +1,422 @@
+#define  INCL_OS2MM                 /* required for MCI and MMIO headers   */
+#define  INCL_DOS
+
+#include <os2.h>
+#include <os2me.h>
+#include <string.h>
+#include <malloc.h>
+#include <math.h>
+#include <stdio.h>
+#include "rtmmm.h"
+
+RTMMM_Local_type        RTMMM;
+RTMMM_Local_type       *RTMMM_Local = &RTMMM;
+
+void exitfunc(){
+    DosKillThread(RTMMM_Local->mixer_thread);
+}
+
+/*******************************************************/
+/*                                                     */
+/*  THREAD   !!!!    THREAD    !!!!                    */
+/*  Priority: Real Time                                */
+/*                                                     */
+/*  uses:      RTMMM_Local->next_play_buffer           */
+/*             RTMMM_Local->buffers_counter_mask       */
+/*  modifies:  RTMMM_Local->next_play_buffer           */
+/*             RTMMM_Local->last_free_buffer           */
+/*******************************************************/
+LONG APIENTRY RTMMM_SendBuffers (ULONG ulStatus,PMCI_MIX_BUFFER pBuffer,ULONG ulFlags){
+   if (( ulFlags & MIX_WRITE_COMPLETE) !=0) {
+      RTMMM_Local->MixSetupParms->pmixWrite(RTMMM_Local->mix_handle,
+          &RTMMM_Local->MixBuffers[RTMMM_Local->next_play_buffer],1);
+      DosEnterCritSec();
+      RTMMM_Local->next_play_buffer++;
+      RTMMM_Local->next_play_buffer &= RTMMM_Local->buffers_counter_mask;
+      RTMMM_Local->last_free_buffer++;
+      RTMMM_Local->last_free_buffer &= RTMMM_Local->buffers_counter_mask;
+      DosExitCritSec();
+      DosPostEventSem(*RTMMM_Local->syncsemaphore);
+   }
+   return( TRUE );
+} /* end MyEvent */
+
+/*******************************************************/
+/*                                                     */
+/*  THREAD   !!!!    THREAD    !!!!                    */
+/*  Priority: Real Time                                */
+/*                                                     */
+/*  uses:      RTMMM_Local->next_play_buffer           */
+/*             RTMMM_Local->last_written_buffer        */
+/*             RTMMM_Local->last_free_buffer           */
+/*             RTMMM_Local->buffers_counter_mask       */
+/*  modifies:  RTMMM_Local->last_written_buffer        */
+/*******************************************************/
+void _System RTMMM_MixerTask(ULONG data){
+    RTMMM_Definition_type    *MixerInfo;
+    RTMMM_InputChannel_type  *input;
+    unsigned char            *input8bit;
+    unsigned short           *input16bit;
+    RTMMM_stereo_type        *output;
+    unsigned int             *output_l;
+    unsigned short           *output_s;
+
+    unsigned int             i;
+    unsigned int             j;
+    unsigned int             start;
+    unsigned int             end;
+    unsigned short           tmp_sample;
+    unsigned int             buffer_samples = RTMMM_Local->buffer_samples;
+    unsigned int             buffer_samples2 = buffer_samples * 2;
+    int                      counter;
+    unsigned long            tmp;
+
+    DosSetPriority(PRTYS_THREAD,PRTYC_TIMECRITICAL,-1,0);
+    MixerInfo = (RTMMM_Definition_type *) data;
+
+    while (1){
+        DosWaitEventSem(*RTMMM_Local->syncsemaphore,SEM_INDEFINITE_WAIT);
+        DosResetEventSem(*RTMMM_Local->syncsemaphore,(PULONG)&tmp);
+
+
+        if (RTMMM_Local->last_written_buffer != RTMMM_Local->last_free_buffer){
+            start =  RTMMM_Local->last_written_buffer;
+            end   =  RTMMM_Local->last_free_buffer;
+            start &= RTMMM_Local->buffers_counter_mask;
+            end   &= RTMMM_Local->buffers_counter_mask;
+            i=start;
+            while (i!=end){
+                 i++;
+                 i&= RTMMM_Local->buffers_counter_mask;
+
+                 output = (RTMMM_stereo_type *)RTMMM_Local->MixBuffers[i].pBuffer;
+                 output_l = (int   *) output;
+                 output_s = (short *) output;
+
+                 for (j=0;j<buffer_samples;j++) *(output_l++) = 0;
+
+                 /* do not touch the settings during mixing */
+                 DosRequestMutexSem(MixerInfo->muxsemaphore,-1);
+                 input = (RTMMM_InputChannel_type *)MixerInfo->inputs;
+
+                 while(input!=NULL){
+                     counter = RTMMM_Local->next_play_buffer - RTMMM_Local->last_written_buffer;
+                     counter &= RTMMM_Local->buffers_counter_mask;
+
+                     while ((input->buffer == NULL) && ((counter--) > 1)){
+                          DosWaitEventSem(*RTMMM_Local->syncsemaphore,SEM_INDEFINITE_WAIT);
+                          DosResetEventSem(*RTMMM_Local->syncsemaphore,(PULONG)&tmp);
+                     }
+
+                     output_s = (short *) output;
+                     if(input->buffer !=NULL){ /* otherwise lose that buffer */
+                         if(input->size == 1){
+                             input8bit = (char *)input->buffer;
+                             if ( input->channels == 1){
+                                 for (j=0;j<buffer_samples;j++){
+                                     tmp_sample      = *input8bit << 8;
+                                     *(output_s++)  += tmp_sample;
+                                     *(output_s++)  += tmp_sample;
+                                     input8bit++;
+                                 } /* for */
+                             } else {  /* channels == 2 8 bit */
+                                 for (j=0;j<buffer_samples2;j++){
+                                     tmp_sample      = *input8bit << 8;
+                                     *(output_s++)  += tmp_sample;
+                                     input8bit++;
+                                 }  /* for */
+                             } /* if */
+                         } else {  /* 16 bit */
+                             input16bit = (short *)input->buffer;
+                             if ( input->channels == 1){
+                                 for (j=0;j<buffer_samples;j++){
+                                     tmp_sample     = *input16bit;
+                                     *(output_s++) += tmp_sample;
+                                     *(output_s++) += tmp_sample;
+                                     input16bit++;
+                                 }  /* for */
+                             } else {  /* 16 bit stereo */
+                                 for (j=0;j<buffer_samples2;j++){
+                                     tmp_sample     = *input16bit;
+                                     *(output_s++) += tmp_sample;
+                                     input16bit++;
+                                 } /* for */
+                             }  /* if channels */
+                         }  /* if 16-8 bit */
+                         input->buffer = NULL; /* mark the data as used */
+                     } /* if !empty buffer */
+                     DosPostEventSem(input->syncsem); /* tell the client to give the next buffer */
+                     input = (RTMMM_InputChannel_type *)input->next;
+                 }  /* while within buffer*/
+                 DosEnterCritSec();
+                 RTMMM_Local->last_written_buffer = i;
+                 DosExitCritSec();
+                 DosReleaseMutexSem(MixerInfo->muxsemaphore);
+            } /* end while through buffers */
+        } /* end if */
+    } /* end while */
+}
+
+void RTMMM_Init(RTMMM_Definition_type **pMixerInfo){   /* The pointer to the shared memory */
+    PSZ                SharedMemName = RTMMM_MEMORY;
+    PSZ                MessageQueueName = RTMMM_QUEUE;
+    MCI_AMP_OPEN_PARMS AmpOpenParms;
+    RTMMM_Definition_type *MixerInfo = NULL;
+
+    RTMMM_Error(
+        DosAllocSharedMem((void *)&MixerInfo,SharedMemName,
+            sizeof(RTMMM_Definition_type),PAG_COMMIT | PAG_WRITE)
+    ,ERR_DOS,"Shared Memory Allocation");
+    *pMixerInfo = MixerInfo;
+
+    MixerInfo->buffers_size   = 0;
+    MixerInfo->buffers_number = 0;
+    MixerInfo->inputs_number  = 0;
+    MixerInfo->inputs         = NULL;
+    MixerInfo->dart_device_id = 0;
+    memset(&MixerInfo->MixSetupParms,'\0',sizeof(MCI_MIXSETUP_PARMS));
+
+    memset(&AmpOpenParms,'\0',sizeof(MCI_AMP_OPEN_PARMS));
+    AmpOpenParms.usDeviceID = ( USHORT ) 0;
+    AmpOpenParms.pszDeviceType = ( PSZ ) MCI_DEVTYPE_AUDIO_AMPMIX;
+
+    RTMMM_Error(
+       mciSendCommand( 0,MCI_OPEN,MCI_WAIT|MCI_OPEN_TYPE_ID,(void *) &AmpOpenParms,0)
+    ,ERR_MCI,"Opening DART device");
+
+    MixerInfo->dart_device_id = AmpOpenParms.usDeviceID;
+
+    RTMMM_Local->MixSetupParms                 = &MixerInfo->MixSetupParms;
+    MixerInfo->MixSetupParms.hwndCallback      = 0;
+    MixerInfo->MixSetupParms.ulBitsPerSample   = 16;
+    MixerInfo->MixSetupParms.ulFormatTag       = MCI_WAVE_FORMAT_PCM;
+    MixerInfo->MixSetupParms.ulSamplesPerSec   = 44000;
+    MixerInfo->MixSetupParms.ulChannels        = 2;
+    MixerInfo->MixSetupParms.ulFormatMode      = MCI_PLAY;
+    MixerInfo->MixSetupParms.ulDeviceType      = MCI_DEVTYPE_WAVEFORM_AUDIO;
+    MixerInfo->MixSetupParms.ulMixHandle       = 0; /* RETURN value here */
+    MixerInfo->MixSetupParms.pmixEvent         = RTMMM_SendBuffers;  /* CallBack routine */
+    MixerInfo->MixSetupParms.pExtendedInfo     = NULL; /* NO Ext Info */
+
+    RTMMM_Error(
+        mciSendCommand(MixerInfo->dart_device_id,MCI_MIXSETUP,MCI_WAIT|MCI_MIXSETUP_INIT,
+                         (void *) &MixerInfo->MixSetupParms,0)
+    ,ERR_MCI,"Setting up DART device");
+
+    MixerInfo->buffers_number            = 8;
+    MixerInfo->BufferParms.ulNumBuffers  = MixerInfo->buffers_number;
+    RTMMM_Local->buffers_number          = MixerInfo->buffers_number;
+    RTMMM_Local->buffers_counter_mask    = 0x7; /* from 0 to 7 */
+    MixerInfo->buffers_size              = 32768;
+    MixerInfo->BufferParms.ulBufferSize  = MixerInfo->buffers_size;
+    RTMMM_Local->buffers_size            = MixerInfo->buffers_size;
+    RTMMM_Local->buffer_samples          =
+        MixerInfo->buffers_size / MixerInfo->MixSetupParms.ulChannels;
+    if (MixerInfo->MixSetupParms.ulBitsPerSample == 16)
+        RTMMM_Local->buffer_samples       >>= 1;
+    MixerInfo->buffers = (MCI_MIX_BUFFER *)malloc(sizeof(MCI_MIX_BUFFER)*MixerInfo->buffers_number);
+    MixerInfo->BufferParms.pBufList      = MixerInfo->buffers; /* Vector of Buffers */
+    RTMMM_Local->MixBuffers              = MixerInfo->buffers;
+    RTMMM_Local->mix_handle              = MixerInfo->MixSetupParms.ulMixHandle;
+
+    RTMMM_Error(
+        mciSendCommand(MixerInfo->dart_device_id,MCI_BUFFER,
+           MCI_WAIT|MCI_ALLOCATE_MEMORY, (void *) &MixerInfo->BufferParms,0)
+    ,ERR_MCI,"Allocating DART memory");
+
+    {  /* filling with 0 data */
+       int i,j;
+       short *p;
+       for (i=0;i< MixerInfo->buffers_number; i++){
+           p = (short *) MixerInfo->buffers[i].pBuffer;
+           for (j=0;j< MixerInfo->buffers_size/2; j++){
+               p[j] = 0;
+           }
+       }
+    }
+    /* adjust settings */
+    RTMMM_Local->next_play_buffer    = RTMMM_STARTUP_BUFFERS;
+    RTMMM_Local->last_free_buffer    = RTMMM_Local->buffers_number - 1;
+    RTMMM_Local->last_written_buffer = RTMMM_STARTUP_BUFFERS - 1;
+
+    printf(" Function address %i handle %i also %i\n",(int)MixerInfo->MixSetupParms.pmixWrite,RTMMM_Local->mix_handle,MixerInfo->MixSetupParms.ulMixHandle);
+
+    /* Kickoff dart */
+    MixerInfo->MixSetupParms.pmixWrite(RTMMM_Local->mix_handle,
+        &RTMMM_Local->MixBuffers[0], RTMMM_STARTUP_BUFFERS);
+
+    /* Prepare semaphores */
+    RTMMM_Error(
+        DosCreateEventSem(NULL,&MixerInfo->syncsemaphore,0L,0)
+    ,ERR_DOS,"Creating Sync Semaphore");
+    RTMMM_Local->syncsemaphore = &MixerInfo->syncsemaphore;
+
+    RTMMM_Error(
+        DosCreateMutexSem(NULL,&MixerInfo->muxsemaphore,DC_SEM_SHARED,0)
+    ,ERR_DOS,"Creating Mutex Semaphore");
+    RTMMM_Local->muxsemaphore = &MixerInfo->muxsemaphore;
+
+    /* Preare message queue */
+    RTMMM_Error(
+        DosCreateQueue(&MixerInfo->message_queue,QUE_FIFO,MessageQueueName)
+    ,ERR_DOS,"Creating message queue");
+
+    /* Kickoff Mixer Task */
+    RTMMM_Error(
+        DosCreateThread(&MixerInfo->mixer_thread,(PFNTHREAD)RTMMM_MixerTask,
+            (ULONG)MixerInfo, CREATE_READY | STACK_COMMITTED,4096)
+    ,ERR_DOS,"Spawning Mixer Task");
+    RTMMM_Local->mixer_thread = MixerInfo->mixer_thread;
+
+}
+
+void RTMMM_Finish(RTMMM_Definition_type *MixerInfo){   /* The pointer to the shared memory */
+    MCI_GENERIC_PARMS    GenericParms;
+
+    RTMMM_Error(
+        mciSendCommand(MixerInfo->dart_device_id,MCI_BUFFER,MCI_WAIT|MCI_DEALLOCATE_MEMORY,
+                        (void *) &MixerInfo->BufferParms,0)
+    ,ERR_MCI,"Deallocating DART memory");
+
+    RTMMM_Error(
+        mciSendCommand(MixerInfo->dart_device_id,MCI_CLOSE,MCI_WAIT ,
+                        (void *)&GenericParms,0 )
+    ,ERR_MCI,"Closing DART");
+}
+
+void RTMMM_Interact(RTMMM_Definition_type *MixerInfo){
+    REQUESTDATA             request;
+    RTMMM_InputChannel_type *client_info, *root,*next;
+    ULONG                   msg_size;
+    BYTE                    priority;
+    void                    *msg;
+    int                     found;
+    int                     i;
+    ULONG                   tmp;
+
+    while(1){
+        RTMMM_Error(
+            DosReadQueue(MixerInfo->message_queue,&request,&msg_size,&msg,0,0,&priority,(HEV)0)
+        ,ERR_DOS,"Listening to the message queue");
+        printf("Size =  %i Address = %x\n",msg_size,msg);
+
+        switch(request.ulData){
+        case RTMMM_QUIT:
+            return;
+        break;
+        case RTMMM_CONNECT:
+            printf("Adding a client %x\n",msg);
+            client_info  = (RTMMM_InputChannel_type *)msg;
+
+            RTMMM_Error(
+                DosGetSharedMem(msg,PAG_WRITE | PAG_READ)
+            ,ERR_DOS,"Getting client shared memory");
+
+            RTMMM_Error(
+                DosOpenEventSem(NULL,&client_info->syncsem)
+            ,ERR_DOS,"Getting client event semaphore");
+
+            client_info->next = (void *)MixerInfo->inputs;
+
+            DosSetPriority(PRTYS_THREAD,PRTYC_TIMECRITICAL,-1,0);
+
+            RTMMM_Error(
+                DosRequestMutexSem(MixerInfo->muxsemaphore,-1)
+            ,ERR_DOS,"Getting mutex sem");
+
+            MixerInfo->inputs = client_info;
+            MixerInfo->inputs_number++;
+
+            RTMMM_Error(
+                DosReleaseMutexSem(MixerInfo->muxsemaphore)
+            ,ERR_DOS,"Releasing mutex sem");
+
+            DosSetPriority(PRTYS_THREAD,PRTYC_REGULAR,0,0);
+
+        break;
+        case RTMMM_DISCONNECT:
+            printf("Removing a client %x\n",msg);
+            found = FALSE;
+            client_info  = (RTMMM_InputChannel_type *)msg;
+            root = MixerInfo->inputs;
+            if (root == client_info) {
+                next = (RTMMM_InputChannel_type *)client_info->next;
+
+                RTMMM_Error(
+                    DosSetPriority(PRTYS_THREAD,PRTYC_TIMECRITICAL,-1,0)
+                ,ERR_DOS,"Raising task priority");
+
+                RTMMM_Error(
+                    DosRequestMutexSem(MixerInfo->muxsemaphore,-1)
+                ,ERR_DOS,"Getting mutex sem");
+
+                MixerInfo->inputs = next;
+                MixerInfo->inputs_number--;
+
+                RTMMM_Error(
+                    DosReleaseMutexSem(MixerInfo->muxsemaphore)
+                ,ERR_DOS,"Releasing mutex sem");
+
+                 RTMMM_Error(
+                    DosSetPriority(PRTYS_THREAD,PRTYC_REGULAR,0,0)
+                ,ERR_DOS,"Reducing task priority");
+                found=TRUE;
+            } else
+                while (root->next!=NULL){
+                    next = (RTMMM_InputChannel_type *)root->next;
+                    if (next == client_info){
+
+                        RTMMM_Error(
+                            DosSetPriority(PRTYS_THREAD,PRTYC_TIMECRITICAL,-1,0)
+                        ,ERR_DOS,"Raising task priority");
+
+                        RTMMM_Error(
+                            DosRequestMutexSem(MixerInfo->muxsemaphore,-1)
+                        ,ERR_DOS,"Getting mutex sem");
+
+                        root->next = next->next;
+                        MixerInfo->inputs_number--;
+
+                        RTMMM_Error(
+                            DosReleaseMutexSem(MixerInfo->muxsemaphore)
+                        ,ERR_DOS,"Releasing mutex sem");
+
+                        RTMMM_Error(
+                            DosSetPriority(PRTYS_THREAD,PRTYC_REGULAR,0,0)
+                        ,ERR_DOS,"Reducing task priority");
+
+                        found=TRUE;
+                    } else root = next;
+                }
+            if (found ==TRUE){
+                RTMMM_Error(
+                    DosCloseEventSem(client_info->syncsem)
+                ,ERR_DOS,"Releasing client semaphore");
+                RTMMM_Error(
+                    DosFreeMem(client_info)
+                ,ERR_DOS,"Freeing shared mem");
+
+                printf("Client %x Removed \n",msg);
+            } else {
+                printf("Client %x Not attached: cannot remove\n",msg);
+            }
+
+        break;
+        }
+    }
+};
+
+
+void main(void){
+    RTMMM_Definition_type *MixerInfo;
+    char s[80],*ss;
+
+    RTMMM_Init(&MixerInfo);
+
+    RTMMM_Interact(MixerInfo);
+
+    RTMMM_Finish(MixerInfo);
+
+
+
+}

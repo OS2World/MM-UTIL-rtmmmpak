@@ -1,0 +1,83 @@
+This announcement has been posted to the following newsgroups:
+  alt.comp.compression, comp.compression, alt.binaries.multimedia,
+  comp.multimedia, alt.binaries.sounds.misc, de.alt.binaries.sounds
+last edit: 6/23/94 14:36:07
+
+Hi MPEG audio fans,
+
+I'd like to announce the second release of my free, software-only MPEG
+audio player maplay. Those of you who are already familiar with maplay 1.1
+may take a look at the list of changes in version 1.2:
+  - required CPU time reduced by 50%
+  - support of 16 bit soundcarts under Linux
+    Implemented by Louis P. Kruger (lpkruger@phoenix.princeton.edu)
+  - 8 kHz u-law realtime playback on amd devices (SPARC 2/IPX/...)
+    or conversion to 8 kHz u-law to stdout
+    Based on an implementation by Jim Boucher (jboucher@flash.bu.edu)
+  - some bug-fixes (-u options, Solaris 2.3 problem, problems with older
+    GNU C++ releases, makedepend usage removed)
+
+All in all version 1.2 is now capable of
+  - playing MPEG audio layer I or II streams on SPARC 10 (SunOS 4.1.3 or
+    Solaris 2.x), Silicon Graphics Indigo (IRIX 4.0.x or IRIX 5.x) and Linux
+    machines in nearly CD-quality. On a SPARC 10/40, maplay needs about
+    46% CPU time for realtime stereo playback and 26% for mono playback.
+    (maplay can't be compiled under IRIX 5.x because of the missing audio
+     library, but an IRIX 4.0.5F binary works under IRIX 5.x, too)
+  - playing these streams in 8 kHz u-law format on SPARC 2/IPX/...
+    (SunOS 4.1.x) machines using the amd device. On a SPARCstation IPX,
+    maplay needs about 43% CPU time for realtime mono playback.
+  - decoding streams to raw 16 bit pcm format at the frequency of the stream
+    (32, 44.1 or 48 kHz) or to 8 bit u-law format downsampled to 8 kHz.
+
+The C++ sourcecode of maplay 1.2 and a short layer II MPEG audio stream
+for testing purposes has been posted to alt.binaries.multimedia on 6/23/94.
+
+The sources and some binaries are available via the ftp server
+ftp.cs.tu-berlin.de in the directory incoming/maplay1.2
+It contains:
+-rw-r--r--   1 bading   doping      4290 Jun 23 14:20 ANNOUNCEMENT
+-rw-r--r--   1 bading   doping     95691 Jun 23 14:19 maplay1_2.tar.Z
+-rwxr-xr-x   1 bading   doping     96497 Jun 22 12:30 maplay_indigo.Z*
+-rwxr-xr-x   1 bading   doping     81469 Jun 22 12:12 maplay_sol2.Z*
+-rwxr-xr-x   1 bading   doping     88881 Jun 22 12:17 maplay_sunos4_1_3.Z*
+-rwxr-xr-x   1 bading   doping     93125 Jun 22 12:35 maplay_ulaw_sunos4_1_3.Z*
+-rw-r--r--   1 bading   doping    372821 Jun 23 12:16 things.mp2
+
+Due to slow Internet connections to this site, please use the mail server
+mail-server@cs.tu-berlin.de. Send an email to this address with the contents
+SEND incoming/maplay1.2/maplay1_2.tar.Z
+and you will receive a mail with an uuencoded copy of the requested file.
+Sending a mail containing "SEND help" returns a mail with more infos about
+this mail server.
+
+The available precompiled binaries are (in compressed format)
+  - maplay_sunos4_1_3.Z
+    for SPARCstations with a dbri device (e.g. SPARC 10, CD-quality)
+    under SunOS 4.1.x (created under SunOS 4.1.3)
+  - maplay_ulaw_sunos4_1_3.Z
+    for SPARCstations with an amd device (e.g. SPARC 2 or IPX, telephone
+    quality) under SunOS 4.1.x using 8 kHz u-law output
+    (created under SunOS 4.1.3)
+  - maplay_sol2.Z
+    for SPARCstations with a dbri device (e.g. SPARC 10, CD-quality)
+    under Solaris 2.x (created under Solaris 2.3 [= SunOS 5.3])
+  - maplay_indigo.Z
+    for Silicon Graphic Indigo machines (CD-quality)
+    under IRIX 4.0.x or IRIX 5.x (created under IRIX 4.0.5F)
+
+To extract the source code, you may use "zcat maplay1_2.tar.Z | tar xvf -"
+or "uncompress maplay1_2.tar.Z ; tar xvf maplay1_2.tar". Please take a look
+at the README file next.
+For a binary, you may use "uncompress maplay_sunos4_1_3.Z".
+
+You may also take a look at the Internet Underground Music Archive (IUMA)
+ftp server sunsite.unc.edu (152.2.22.81) in the directory
+/pub/electronic-publications/IUMA/audio_utils/mpeg_players/Workstations
+
+If you are also looking for an encoder, please take a look at the file
+/pub/electronic-publications/IUMA/audio_utils/converters/source/mpegaudio.tar.Z
+on the IUMA ftp server. It contains sources for an encoder and a decoder.
+
+That's all for now,
+                    Tobias Bading   (bading@cs.tu-berlin.de)

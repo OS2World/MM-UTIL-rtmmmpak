@@ -1,0 +1,189 @@
+RTMMM v 1.0 alpha
+
+26-October-1996
+
+Filippo Sartori
+
+1)WHAT IS RTMMM?
+RTMMM is a program to digitally mix multiple sources into DART.
+You can write many different players to support it. The result will be
+the mixing of them all.
+RTMMM stands for Real Time MultiMedia Mixer
+
+2)HOW REAL-TIME IS IT?
+It depends on the size and on the number of buffers. For now it has
+8 32k buffers. The number of buffers to be played before the new source get
+played varyes.. 256k /44k*2*2 =  1.5 seconds!! too much!!
+Reducing this number is not a problem, I have tried with 2K buffers.
+The CPU used goes up anyway...
+
+3) HOW DOES THE CLIENT CONNECT TO THE SERVER?
+What a technical question...  ehmm..
+The server..no the client first..
+What the hell I wrote it!
+The Server provides a shared memory with infos about itself.
+The client will create its own memory with its own buffers and pass it 
+to the server by sending a message to a QUEUE.
+The real-time protocol is simple. The Server reads a pointer in the 
+Client`s memory to find the address of the next buffer. It then tells the client 
+that it has used this buffer posting a semaphore..
+
+4) AND the CONSOLE??
+The server has also a PIPE interface. 
+You can ask him 
+1)
+GetClientInfo .
+The answer will be:
+number_of_active_channels\n
+Chan_number Chan_type Chan_name frequency n_of_channels kright kleft kfilt mute master_vol
+Chan_number Chan_type Chan_name frequency n_of_channels kright kleft kfilt mute master_vol
+Chan_number Chan_type Chan_name frequency n_of_channels kright kleft kfilt mute master_vol
+...
+
+
+Chan_number   Is the channel number 
+Chan_type     Is the name of the source i.e. MAPLAY
+Chan_name     Is the song name for instance
+frequency     Is the frequency of playback
+n_of_channels Is 1 for mono 2 for stereo
+kright        Is the gain for the right channel times 32768
+kleft         Is the gain for the left  channel times 32768
+kfilt         Is the k of a first order filter times 32768 k is between 0 and 1
+mute          Is 1 for a playing channel 0 for a muted channel
+master_vol    Is the main gain times 32768
+
+2)
+SetClientMixing  channel mute master_volume kright kleft kfilt 
+The answer will be 0
+It will use the parameters to set-up the given channel
+
+
+3)
+GetEventNumber .
+The answer will be the number of events so far.
+An event is a start or a stop of a song.
+Useful to Synchronize two programs...
+
+5) WHAT THE HELL IS IT ALL FOR?
+Well ....
+The idea is to finally, thank to your help, obtain a set of 
+players ranging from CD-ROM MOD WAV MIDI SoundCard .....
+that will play through RTMMM.
+The catch is 
+a) No more annoying " the device is used" messages when trying to 
+play a somg when MMOS2 is already taken..
+b) Develop a MIXING system using a PC.
+Could be for small broadcast etc..
+c) Enjoing ourselves
+d) Making something that noone has done before...
+e) What about a music interface for XFREE..
+Using RTMMM means not using DART since DART is already dealt with in
+the server. The client does not have to know about OS/2....
+.....
+
+6) AND DSMI?
+Nice piece of work..
+Hope to convince them to support RTMMM as an output....
+I had some discussion with Pierre about RTMMM and he was trying 
+to convince me to use DSMI as a base for my work.
+I found this problems:
+a) DSMI is much more than what I needed.
+b) DSMI is not exactly designed for what I was doing
+c) DSMI does not support EMX
+d) DSMI costs money
+
+7) Collaboration
+Send E-MAIL to me at fisa@jey.uk
+We may discuss about what to do.
+I am interested in your suggestions.
+
+8) RELEASE
+I am still undecided if to release the source of RTMMM.
+I will certainly give it to anybody that will contribute substantially.
+
+9) ITS FREEWARE...
+You can use it misuse it abuse it
+
+10) IT DOES NOT WORK!!!
+Well I am sorry for you.
+MAIL mem with the details, I will see what to do.
+
+11) NOTE!!!!
+I am not responsible of any damage that the program will do to your system!
+Use it at your risk..
+( Must say that !! No one knows what the fortune will prepare for you..)
+
+12) MAPLAY
+Yes it is maplay!
+It works beautifully!
+It does not support play-lists. It will with a lot more..
+It supports DART without RTMMM or through RTMMM
+I was able to play 5 mp2 audio musics at the same time!!!!!
+I then became cocky and tried 7..... well RTMMM locked up..
+There is a bug when RTMMM does not feed DART at the right time...
+
+13) FUTURE IDEAS?
+
+SOM:
+I would like to implement a lot of players using som so that they will
+integrate in WARP 4 beautifully.
+This is a side where I could use some help...
+
+CD-ROM
+I would like to have a player that was able to read from a CD-ROM..
+It should be able to allow the playing of multiple songs from the same CD-ROM
+
+MODS
+I sure hope that MUSE/2 DMP(DSMI) UTIMOD etc will be ported to support RTMMM
+
+GAMES
+I hope that RTMMM wil have such a success to convince people to use it 
+instead of DART also for games, see STARDOCK!!
+
+WAVS:
+Easy this one...
+
+MPEG layer3
+I have something to work on..
+Sure MAPLAY could use some optimization anyway...
+Manual of PENTIUM is on the Way.. 
+
+MIDI
+This is a possible nice application..
+Read midi from a file or a port and synthetise a real-time..
+Sure is a hell of a work
+
+RTMMM:
+It will get an output stadium where it will be implemented:
+1) Volume control to keep the average output power to a given value
+2) filters + reverber + echo with real-time settable values
+3) a subsampled output in shared memory for scopes or etc...
+4) an alternative output for monitoring..
+5).... IDEAS?
+
+14) PROGRAMMERS
+Ask me via e-mail...
+See in MAPLAY obuffer.cc obuffer.h 
+See rtmmm.h
+See test1.c
+If you have VX-REXX see the source of the monitor
+
+15) CONCLUSION
+Please INTEL give us a faster PC.....
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
